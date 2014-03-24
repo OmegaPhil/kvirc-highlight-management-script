@@ -1,0 +1,1094 @@
+# Highlight Management Script
+# ===========================
+
+# Version 1.2 February 2011
+
+/*
+Copyright (C) 2011-2014 OmegaPhil (OmegaPhil+KVIrc@gmail.com)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+
+# EVENTS BLOCK
+# Interception of highlights
+event(OnHighlight,HighlightManagementScript)
+{
+    # $0 = talker nick
+    # $1 = target username
+    # $2 = target hostname
+    # $3 = message
+    # $4 = highlight word
+    # $5 = message type
+    # $6 = is action
+    
+    # Exiting if script is turned off
+    if (%HighlightManagementScript_Settings{"Status"} == "Off") return
+    
+    # Setting nick
+    %nick = $0
+
+    # Setting channel
+    %channel = $target
+    
+    # Setting message
+    %message = $3
+    
+    # Checking if the channel and/or nick is blacklisted
+    if ($HighlightManagementScript::IsHighlight(%nick, %channel) == $false)
+    {
+        # The highlight is blacklisted - echoing the message in the channel without triggerring highlighting (KVIrc is able to substitute the user and host fields itself)
+        echoprivmsg --no-highlighting %nick * * %message
+        
+        # Halting KVIrc's processing to prevent the original message
+        halt
+    }
+    else
+    {
+        # No need to take action with successful highlights yet
+    }
+}
+
+# Interception of script start event
+event(OnKVIrcStartup,HighlightManagementScript)
+{
+    # Running startup
+    HighlightManagementScript::Startup
+}
+
+
+# ALIASES
+# HighlightManagementScript alias
+# Usage: HighlightManagementScript <command>. <nothing>: Echos the status of the script. on: Turns script on. off: Turns script off. listnicks: Echoes all currently blacklisted nicks. addnick <network> <nick> [<notes>]: Adds the requested nick to the nick blacklist with notes if specified. deletenick <network> <nick>: Deletes the requested nick from the nick blacklist. listchans: Lists blacklisted chans. addchan <network name> <chan> [<notes>]: Adds the requested channel to the channel blacklist with notes if specified. deletechan <network name> <chan>: Deletes the requested channel from the channel blacklist. h/help: Echos usage instructions.
+alias(HighlightManagementScript)
+{
+    # Variable allocation
+    %usageInstructions = "Usage: HighlightManagementScript <command>. <nothing>: Echos the status of the script. on: Turns script on. off: Turns script off. listnicks: Echoes all currently blacklisted nicks. addnick <network> <nick> [<notes>]: Adds the requested nick to the nick blacklist with notes if specified. deletenick <network> <nick>: Deletes the requested nick from the nick blacklist. listchans: Lists blacklisted chans. addchan <network name> <chan> [<notes>]: Adds the requested channel to the channel blacklist with notes if specified. deletechan <network name> <chan>: Deletes the requested channel from the channel blacklist. h/help: Echos usage instructions."
+    
+    # Intercepting status request (nothing passed to the alias)
+    if ($0 == "")
+    {
+        echo "Script is currently "%HighlightManagementScript_Settings{"Status"}"."
+        return
+    }
+    
+    # Intercepting help requests
+    if ($0 == "h" || $0 == "help")
+    {
+        echo %usageInstructions
+        return
+    }
+    
+    # Intercepting on request
+    if ($0 == "On")
+    {
+        # Making sure script is off
+        if (%HighlightManagementScript_Settings{"Status"} != "Off")
+        {
+            # Script is already on - informing user and exiting
+            warning "Script is already on."
+            return
+        }
+        
+        # Turning script on
+        %HighlightManagementScript_Settings{"Status"} = "On"
+        
+        # Informing user script has been turned on
+        echo "Highlight Management Script has been turned on."
+        return
+    }
+    
+    # Intercepting off request
+    if ($0 == "Off")
+    {
+        # Making sure script is on
+        if (%HighlightManagementScript_Settings{"Status"} != "On")
+        {
+            # Script is already off - informing user and exiting
+            warning "Script is already off."
+            return
+        }
+        
+        # Turning script off
+        %HighlightManagementScript_Settings{"Status"} = "Off"
+        
+        # Informing user script has been turned off
+        echo "Highlight Management Script has been turned off."
+        return
+    }
+    
+    # Intercepting listnicks command
+    if ($0 == "listnicks")
+    {
+        # Informational message
+        echo "Listing blacklisted nicks..."
+        
+        # Checking if there are no blacklisted nicks
+        if ($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"})[]# == 0)
+        {
+            # There aren't - informing user and exiting
+            echo "No nicks are currently blacklisted."
+            return
+        }
+
+        # Looping for all networks that contain blacklisted nicks
+        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
+        foreach(%network,%sortedNetworks)
+        {
+            echo "\nOn "%network":"
+            
+            # Looping for all blacklisted nicks in network
+            %sortedNicks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}))
+            foreach(%nick,%sortedNicks)
+            {
+                # Obtaining potential notes
+                %notes = %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%nick}
+                
+                # Echoing nick (with notes if they exist)
+                if (%notes != %nick)
+                {
+                    # Notes present
+                    echo %nick" - Notes: "%notes
+                }
+                else
+                {
+                    # Notes not present
+                    echo %nick
+                }
+            }
+        }
+        
+        # Informational message
+        echo "\nBlacklisted nicks listed."
+        return
+    }
+    
+    # Intercepting addnick command
+    # Return codes:
+    # 0: Success
+    # 1: Network wasn't specified
+    # 2: Nick wasn't specified
+    # 3: Nick already blacklisted on network
+    if ($0 == "addnick")
+    {
+        # Verifying parameters
+        # Making sure a network was specified
+        if ($1 == "")
+        {
+            # No network was specified - informing user and exiting
+            warning "Please specify a network when adding to the nick blacklist."
+            return 1
+        }
+        
+        # Setting network 
+        %network = $1
+        
+        # Making sure a nick was specified
+        if ($2 == "")
+        {
+            # No nick was specified - informing user and exiting
+            warning "Please specify a nick to add to the nick blacklist. Parameters: '"$0-"'"
+            return 2
+        }
+        
+        # Setting blacklistNick
+        %blacklistNick = $2
+        
+        # Setting notes
+        if ($3- != "")
+        {
+            %notes = $3-
+        }
+        else
+        {
+            # Padding with nick - KVIrc doesn't allow empty hash items
+            %notes = %blacklistNick
+        }
+        
+        # Making sure nick isn't already blacklisted on the given network
+        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} != "")
+        {
+            # Nick is already blacklisted, informing user and exiting
+            warning %blacklistNick" is already blacklisted on "%network"."
+            return 3
+        }
+        
+        # Adding blacklistNick on network with notes and saving
+        %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} = %notes
+        HighlightManagementScript::Save
+        
+        # Informational message
+        if (%notes != %blacklistNick)
+        {
+            echo %blacklistNick" ("%notes") has been added to the nick blacklist on "%network"."
+        }
+        else
+        {
+            echo %blacklistNick" has been added to the nick blacklist on "%network"."
+        }
+        return 0
+    }
+    
+    # Intercepting deletenick command
+    # Return codes:
+    # 0: Success
+    # 1: Network wasn't specified
+    # 2: Nick wasn't specified
+    # 3: Nick isn't blacklisted on network
+    if ($0 == "deletenick")
+    {
+        # Verifying parameters
+        # Making sure a network was specified
+        if ($1 == "")
+        {
+            # No network was specified - informing user and exiting
+            warning "Please specify a network when deleting from the nick blacklist."
+            return 1
+        }
+        
+        # Setting network 
+        %network = $1
+        
+        # Making sure a nick was specified
+        if ($2 == "")
+        {
+            # No nick was specified - informing user and exiting
+            warning "Please specify a nick to delete from the nick blacklist. Parameters: '"$0-"'"
+            return 2
+        }
+        
+        # Setting blacklistNick
+        %blacklistNick = $2
+        
+        # Making sure nick is blacklisted on the given network
+        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} == "")
+        {
+            # Nick has not been blacklisted on the given network, informing user and exiting
+            warning %blacklistNick" has not been blacklisted on "%network"."
+            return 3
+        }
+        
+        # Deleting blacklistNick on network and saving
+        %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} = ""
+        HighlightManagementScript::Save
+        
+        # Informational message
+        echo %blacklistNick" has been deleted from the nick blacklist on "%network"."
+        return 0
+    }
+    
+    # Intercepting listchans command
+    if ($0 == "listchans")
+    {
+        # Informational message
+        echo "Listing blacklisted channels..."
+        
+        # Checking if there are no blacklisted channels
+        if ($keys(%HighlightManagementScript_Settings{"BlacklistedChans"})[]# == 0)
+        {
+            # There aren't - informing user and exiting
+            echo "No channels are currently blacklisted."
+            return
+        }
+        
+        # Looping for all networks that contain blacklisted channels
+        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}))
+        foreach(%network,%sortedNetworks)
+        {
+            echo "\nOn "%network":"
+            
+            # Looping for all blacklisted channels in network
+            %sortedChannels = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}))
+            foreach(%channel,%sortedChannels)
+            {
+                # Obtaining potential notes
+                %notes = %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%channel}
+                
+                # Echoing channel (with notes if they exist)
+                if (%notes != %channel)
+                {
+                    # Notes present
+                    echo %channel" - Notes: "%notes
+                }
+                else
+                {
+                    # Notes not present
+                    echo %channel
+                }
+            }
+        }
+        
+        # Informational message
+        echo "\nBlacklisted channels listed."
+        return
+    }
+    
+    # Intercepting addchan command
+    # Return codes:
+    # 0: Success
+    # 1: Network wasn't specified
+    # 2: Channel wasn't specified
+    # 3: Channel already blacklisted on network
+    if ($0 == "addchan")
+    {
+        # Verifying parameters
+        # Making sure a network was specified
+        if ($1 == "")
+        {
+            # No network was specified - informing user and exiting
+            warning "Please specify a network when adding to the channel blacklist."
+            return 1
+        }
+        
+        # Setting network 
+        %network = $1
+        
+        # Making sure a channel was specified
+        if ($2 == "")
+        {
+            # No channel was specified - informing user and exiting
+            warning "Please specify a channel to add to the channel blacklist. Parameters: '"$0-"'"
+            return 2
+        }
+        
+        # Setting blacklistChannel
+        %blacklistChannel = $2
+        
+        # Setting notes
+        if ($3- != "")
+        {
+            %notes = $3-
+        }
+        else
+        {
+            # Padding with channel - KVIrc doesn't allow empty hash items
+            %notes = %blacklistChannel
+        }
+        
+        # Making sure channel isn't already blacklisted on the given network
+        if (%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} != "")
+        {
+            # Channel is already blacklisted, informing user and exiting
+            warning %blacklistChannel" is already blacklisted on "%network"."
+            return 3
+        }
+        
+        # Adding blacklistChannel on network with notes and saving
+        %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} = %notes
+        HighlightManagementScript::Save
+        
+        # Informational message
+        if (%notes != %blacklistChannel)
+        {
+            echo %blacklistChannel" ("%notes") has been added to the channel blacklist on "%network"."
+        }
+        else
+        {
+            echo %blacklistChannel" has been added to the channel blacklist on "%network"."
+        }
+        return 0
+    }
+    
+    # Intercepting deletechan command
+    # Return codes:
+    # 0: Success
+    # 1: Network wasn't specified
+    # 2: Channel wasn't specified
+    # 3: Channel isn't blacklisted on network
+    if ($0 == "deletechan")
+    {
+        # Verifying parameters
+        # Making sure a network was specified
+        if ($1 == "")
+        {
+            # No network was specified - informing user and exiting
+            warning "Please specify a network when deleting from the channel blacklist."
+            return 1
+        }
+        
+        # Setting network 
+        %network = $1
+        
+        # Making sure a channel was specified
+        if ($2 == "")
+        {
+            # No channel was specified - informing user and exiting
+            warning "Please specify a channel to delete from the channel blacklist. Parameters: '"$0-"'"
+            return 2
+        }
+        
+        # Setting blacklistChannel
+        %blacklistChannel = $2
+        
+        # Making sure channel is blacklisted on the given network
+        if (%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} == "")
+        {
+            # Channel has not been blacklisted on the given network, informing user and exiting
+            warning %blacklistChannel" has not been blacklisted on "%network"."
+            return 3
+        }
+        
+        # Deleting blacklistChannel on network and saving
+        %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} = ""
+        HighlightManagementScript::Save
+        
+        # Informational message
+        echo %blacklistChannel" has been deleted from the channel blacklist on "%network"."
+        return 0
+    }
+    
+    # If the script reaches here, command hasn't been recognised. Informing user and exiting
+    warning "The command '"$0-"' has not been recognised. Please see 'h/help' for usage instructions."
+}
+
+# HighlightManagementScript::IsHighlight alias
+# Usage: HighlightManagementScript::IsHighlight <nick> <channel>
+# Returns $true/$false based on whether the highlight is valid or not
+alias(HighlightManagementScript::IsHighlight)
+{
+    # Making sure nick is passed
+    if ($0 == "") error "HighlightManagementScript::IsHighlight was called without passing a nick."
+    
+    # Setting nick
+    %nick = $0
+    
+    # Making sure channel is passed
+    if ($1 == "") error "HighlightManagementScript::IsHighlight was called without passing a channel. Parameters: '"$0-"'."
+
+    # Setting channel
+    %channel = $1
+
+    # Returning whether highlight was valid or not (channel and/or nick is blacklisted or not)
+    if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{$context.networkName}{%nick} != "" || %HighlightManagementScript_Settings{"BlacklistedChans"}{$context.networkName}{%channel} != "")
+    {
+        return $false
+    }
+    else
+    {
+        return $true
+    }
+}
+
+# HighlightManagementScript::Save alias
+alias(HighlightManagementScript::Save)
+{
+    # Opening config file
+    %configFileID = $config.open($file.localdir("/scripts/highlight_management_script_settings"))
+    
+    # Saving settings
+    config.clearsection %configFileID "KVIrc"
+    config.write %configFileID "HighlightManagementScript_Settings" $serialize(%HighlightManagementScript_Settings)
+
+    # Committing settings
+    config.close %configFileID
+}
+
+# HighlightManagementScript::Startup alias
+alias(HighlightManagementScript::Startup)
+{
+    # Making sure settings directory exists
+    if ($file.exists($file.localdir("/scripts/")) == $false) file.mkdir $file.localdir("/scripts/")
+    
+    # Loading settings if the config file exists
+    if ($file.exists($file.localdir("/scripts/highlight_management_script_settings")) == $true)
+    {
+        # Opening config file
+        %configFileID = $config.open($file.localdir("/scripts/highlight_management_script_settings"))
+        
+        # Loading settings
+        %HighlightManagementScript_Settings = $unserialize($config.read(%configFileID, "HighlightManagementScript_Settings"))
+        
+        # Closing configuration file
+        config.close %configFileID
+    }
+
+    # Initialising settings if needed
+    if (%HighlightManagementScript_Settings{"Status"} == "") %HighlightManagementScript_Settings{"Status"} = "On"
+
+    # Creating dialogs
+    # Add Nick To Blacklist dialog
+    %dialog = $new(dialog,,"HighlightManagementScript_AddNickToHighlightBlacklist")
+    %dialog->$setWindowTitle("Add Nick To Highlight Blacklist")
+
+    %vbox = $new(vbox,%dialog,"VBox")
+    %layout = $new(layout,%dialog)
+    %layout->$addRowSpacing(0,30)
+    %layout->$addWidget(%vbox,0,0)
+    
+    %label_network = $new(label,%vbox)
+    %label_network->$setText("Network:")
+    
+    %lineedit_network = $new(lineedit,%vbox,"Network")
+    %dialog->%lineedit_network = %lineedit_network
+    
+    %label_nick = $new(label,%vbox)
+    %label_nick->$setText("Nick:")
+    %lineedit_nick = $new(lineedit,%vbox,"Nick")
+    %dialog->%lineedit_nick = %lineedit_nick
+
+    %label_notes = $new(label,%vbox)
+    %label_notes->$setText("Notes (optional):")
+    %multilineedit_notes = $new(multilineedit,%vbox,"Notes")
+    %dialog->%multilineedit_notes = %multilineedit_notes
+
+    %hbox = $new(hbox,%dialog)
+    %layout->$addWidget(%hbox,1,0)
+
+    %button_OK = $new(button, %hbox)
+    %button_OK->$setText("OK")
+
+    %button_Cancel = $new(button, %hbox)
+    %button_Cancel->$setText("Cancel")
+
+    # Event overrides
+    privateimpl(%dialog,"showevent")
+    {
+        # Clearing widgets and focussing
+        $$->%lineedit_network->$clear
+        $$->%lineedit_nick->$clear
+        $$->%multilineedit_notes->$clear
+        $$->%lineedit_network->$setFocus
+    }
+
+    privateimpl(%dialog,"OK")
+    {
+        # Obtaining information
+        %network = $$->%lineedit_network->$Text
+        %nick = $$->%lineedit_nick->$Text
+        %notes = $$->%multilineedit_notes->$Text
+
+        # Adding nick to blacklist
+        %return = $HighlightManagementScript("addnick", %network, %nick, %notes)
+
+        # Dealing with results
+        switch (%return)
+        {
+            case(0)
+            {
+                # Success - reporting based on presence of notes
+                if (%notes != "")
+                {
+                    dialog.message -i=$icon("serverinfo") ("Add Nick To Highlight Blacklist", "Added "%nick" ("%notes") to nick blacklist on "%network".","escape=Cancel") { }
+                }
+                else
+                {
+                    dialog.message -i=$icon("serverinfo") ("Add Nick To Highlight Blacklist", "Added "%nick" to nick blacklist on "%network".","escape=Cancel") { }
+                }
+                $$->$hide
+            }
+            
+            case(1)
+            {
+                # Network wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Add Nick To Highlight Blacklist", "Please specify a network to blacklist on.","escape=Cancel") { }
+            }
+            
+            case(2)
+            {
+                # Nick wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Add Nick To Highlight Blacklist", "Please specify a nick to blacklist on "%network".","escape=Cancel") { }
+            }
+
+            case(3)
+            {
+                # Nick already blacklisted on network
+                dialog.message -i=$icon("socketwarning") ("Add Nick To Highlight Blacklist", %nick" is already blacklisted on "%network".","escape=Cancel") { }
+            }
+        }
+    }
+
+    privateimpl(%dialog,"Cancel")
+    {
+        # Hiding dialog
+        $$->$hide
+    }
+    
+    objects.connect %button_OK clicked %dialog OK
+    objects.connect %button_Cancel clicked %dialog Cancel
+    
+    # Saving dialog object ID
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_AddNickToHighlightBlacklist"} = %dialog
+
+    # Delete Nick From Blacklist dialog
+    %dialog = $new(dialog,,"HighlightManagementScript_DeleteNickFromHighlightBlacklist")
+    %dialog->$setWindowTitle("Delete Nick From Highlight Blacklist")
+
+    %vbox = $new(vbox,%dialog,"VBox")
+    %layout = $new(layout,%dialog)
+    %layout->$addRowSpacing(0,30)
+    %layout->$addWidget(%vbox,0,0)
+    
+    %label_network = $new(label,%vbox)
+    %label_network->$setText("Network:")
+    %listbox_network = $new(listbox,%vbox,"Network")
+    %dialog->%listbox_network = %listbox_network
+    
+    %label_nick = $new(label,%vbox)
+    %label_nick->$setText("Nick:")
+    %listbox_nick = $new(listbox,%vbox,"Nick")
+    %dialog->%listbox_nick = %listbox_nick
+
+    %hbox = $new(hbox,%dialog)
+    %layout->$addWidget(%hbox,1,0)
+
+    %button_OK = $new(button, %hbox)
+    %button_OK->$setText("OK")
+
+    %button_Cancel = $new(button, %hbox)
+    %button_Cancel->$setText("Cancel")
+
+    # Event overrides
+    privateimpl(%dialog,"showevent")
+    {
+        # Populating listbox_network 
+        $$->%listbox_network->$clear
+        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
+        foreach(%network,%sortedNetworks) $$->%listbox_network->$insertitem(%network)
+
+        # Clearing listbox_nick
+        $$->%listbox_nick->$clear
+        
+        # Focussing listbox_network
+        $$->%listbox_network->$setFocus
+    }
+
+    privateimpl(%listbox_network,"currentItemChangedEvent")
+    {
+        # A network has been selected - obtaining network
+        %network = $$->$currentText
+        
+        # Making sure network is available (the first event firing is before this)
+        if (%network != "")
+        {
+            # Obtaining dialog object ID
+            %dialog = %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteNickFromHighlightBlacklist"}
+            
+            # Populating nick listbox
+            %dialog->%listbox_nick->$clear
+            %sortedNicks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}))
+            foreach(%nick,%sortedNicks) %dialog->%listbox_nick->$insertitem(%nick)
+        }
+    }
+
+    privateimpl(%dialog,"OK")
+    {
+        # Obtaining information
+        %network = $$->%listbox_network->$currentText
+        %nick = $$->%listbox_nick->$currentText
+
+        # Deleting nick from blacklist
+        %return = $HighlightManagementScript("deletenick", %network, %nick, %notes)
+        
+        # Dealing with results
+        switch (%return)
+        {
+            case(0)
+            {
+                # Success
+                dialog.message -i=$icon("serverinfo") ("Delete Nick From Highlight Blacklist", "Deleted "%nick" from blacklist on "%network".","escape=Cancel") { }
+                $$->$hide
+            }
+            
+            case(1)
+            {
+                # Network wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Delete Nick From Highlight Blacklist", "Please specify a network to remove a blacklisted nick from.","escape=Cancel") { }
+            }
+            
+            case(2)
+            {
+                # Nick wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Delete Nick From Highlight Blacklist", "Please specify a nick to remove from the blacklist on "%network".","escape=Cancel") { }
+            }
+
+            case(3)
+            {
+                # Nick isn't blacklisted on network
+                dialog.message -i=$icon("socketwarning") ("Delete Nick From Highlight Blacklist", %nick" is not blacklisted on "%network".","escape=Cancel") { }
+            }
+        }
+    }
+
+    privateimpl(%dialog,"Cancel")
+    {
+        # Hiding dialog
+        $$->$hide
+    }
+    
+    objects.connect %button_OK clicked %dialog OK
+    objects.connect %button_Cancel clicked %dialog Cancel
+    
+    # Saving dialog object ID
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteNickFromHighlightBlacklist"} = %dialog
+
+    # Add Channel To Blacklist dialog
+    %dialog = $new(dialog,,"HighlightManagementScript_AddChannelToHighlightBlacklist")
+    %dialog->$setWindowTitle("Add Channel To Highlight Blacklist")
+
+    %vbox = $new(vbox,%dialog,"VBox")
+    %layout = $new(layout,%dialog)
+    %layout->$addRowSpacing(0,30)
+    %layout->$addWidget(%vbox,0,0)
+    
+    %label_network = $new(label,%vbox)
+    %label_network->$setText("Network:")
+    
+    %lineedit_network = $new(lineedit,%vbox,"Network")
+    %dialog->%lineedit_network = %lineedit_network
+    
+    %label_channel = $new(label,%vbox)
+    %label_channel->$setText("Channel:")
+    %lineedit_channel = $new(lineedit,%vbox,"Channel")
+    %dialog->%lineedit_channel = %lineedit_channel
+
+    %label_notes = $new(label,%vbox)
+    %label_notes->$setText("Notes (optional):")
+    %multilineedit_notes = $new(multilineedit,%vbox,"Notes")
+    %dialog->%multilineedit_notes = %multilineedit_notes
+
+    %hbox = $new(hbox,%dialog)
+    %layout->$addWidget(%hbox,1,0)
+
+    %button_OK = $new(button, %hbox)
+    %button_OK->$setText("OK")
+
+    %button_Cancel = $new(button, %hbox)
+    %button_Cancel->$setText("Cancel")
+
+    # Event overrides
+    privateimpl(%dialog,"showevent")
+    {
+        # Clearing widgets
+        $$->%lineedit_network->$clear
+        $$->%lineedit_channel->$clear
+        $$->%multilineedit_notes->$clear
+        $$->%lineedit_network->$setFocus
+    }
+
+    privateimpl(%dialog,"OK")
+    {
+        # Obtaining information
+        %network = $$->%lineedit_network->$Text
+        %channel = $$->%lineedit_channel->$Text
+        %notes = $$->%multilineedit_notes->$Text
+
+        # Adding channel to blacklist
+        %return = $HighlightManagementScript("addchan", %network, %channel, %notes)
+
+        # Dealing with results
+        switch (%return)
+        {
+            case(0)
+            {
+                # Success - reporting based on presence of notes
+                if (%notes != "")
+                {
+                    dialog.message -i=$icon("serverinfo") ("Add Channel To Highlight Blacklist", "Added "%channel" ("%notes") to channel blacklist on "%network".","escape=Cancel") { }
+                }
+                else
+                {
+                    dialog.message -i=$icon("serverinfo") ("Add Channel To Highlight Blacklist", "Added "%channel" to channel blacklist on "%network".","escape=Cancel") { }
+                }
+                $$->$hide
+            }
+            
+            case(1)
+            {
+                # Network wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Add Channel To Highlight Blacklist", "Please specify a network to blacklist on.","escape=Cancel") { }
+            }
+
+            case(2)
+            {
+                # Channel wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Add Channel To Highlight Blacklist", "Please specify a channel to blacklist on "%network".","escape=Cancel") { }
+            }
+
+            case(3)
+            {
+                # Channel already blacklisted on network
+                dialog.message -i=$icon("socketwarning") ("Add Channel To Highlight Blacklist", %channel" is already blacklisted on "%network".","escape=Cancel") { }
+            }
+        }
+    }
+
+    privateimpl(%dialog,"Cancel")
+    {
+        # Hiding dialog
+        $$->$hide
+    }
+    
+    objects.connect %button_OK clicked %dialog OK
+    objects.connect %button_Cancel clicked %dialog Cancel
+    
+    # Saving dialog object ID
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_AddChannelToHighlightBlacklist"} = %dialog
+
+    # Delete Channel From Blacklist dialog
+    %dialog = $new(dialog,,"HighlightManagementScript_DeleteChannelFromHighlightBlacklist")
+    %dialog->$setWindowTitle("Delete Channel From Highlight Blacklist")
+
+    %vbox = $new(vbox,%dialog,"VBox")
+    %layout = $new(layout,%dialog)
+    %layout->$addRowSpacing(0,30)
+    %layout->$addWidget(%vbox,0,0)
+    
+    %label_network = $new(label,%vbox)
+    %label_network->$setText("Network:")
+    %listbox_network = $new(listbox,%vbox,"Network")
+    %dialog->%listbox_network = %listbox_network
+    
+    %label_channel = $new(label,%vbox)
+    %label_channel->$setText("Channel:")
+    %listbox_channel = $new(listbox,%vbox,"Channel")
+    %dialog->%listbox_channel = %listbox_channel
+
+    %hbox = $new(hbox,%dialog)
+    %layout->$addWidget(%hbox,1,0)
+
+    %button_OK = $new(button, %hbox)
+    %button_OK->$setText("OK")
+
+    %button_Cancel = $new(button, %hbox)
+    %button_Cancel->$setText("Cancel")
+
+    # Event overrides
+    privateimpl(%dialog,"showevent")
+    {
+        # Populating listbox_network 
+        $$->%listbox_network->$clear
+        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}))
+        foreach(%network,%sortedNetworks) $$->%listbox_network->$insertitem(%network)
+
+        # Clearing listbox_channel
+        $$->%listbox_channel->$clear
+
+        # Focussing listbox_network
+        $$->%listbox_network->$setFocus
+    }
+
+    privateimpl(%listbox_network,"currentItemChangedEvent")
+    {
+        # A network has been selected - obtaining network
+        %network = $$->$currentText
+        
+        # Making sure network is available (the first event firing is before this)
+        if (%network != "")
+        {
+            # Obtaining dialog object ID
+            %dialog = %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"}
+            
+            # Populating channel listbox
+            %dialog->%listbox_channel->$clear
+            %sortedChannels = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}))
+            foreach(%channel,%sortedChannels) %dialog->%listbox_channel->$insertitem(%channel)
+        }
+    }
+
+    privateimpl(%dialog,"OK")
+    {
+        # Obtaining information
+        %network = $$->%listbox_network->$currentText
+        %channel = $$->%listbox_channel->$currentText
+
+        # Deleting channel from blacklist
+        %return = $HighlightManagementScript("deletechan", %network, %channel, %notes)
+        
+        # Dealing with results
+        switch (%return)
+        {
+            case(0)
+            {
+                # Success
+                dialog.message -i=$icon("serverinfo") ("Delete Channel From Highlight Blacklist", "Deleted "%channel" from blacklist on "%network".","escape=Cancel") { }
+                $$->$hide
+            }
+            
+            case(1)
+            {
+                # Network wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Delete Channel From Highlight Blacklist", "Please specify a network to remove a blacklisted channel from.","escape=Cancel") { }
+            }
+            
+            case(2)
+            {
+                # Channel wasn't specified
+                dialog.message -i=$icon("socketwarning") ("Delete Channel From Highlight Blacklist", "Please specify a channel to remove from the blacklist on "%network".","escape=Cancel") { }
+            }
+
+            case(3)
+            {
+                # Channel isn't blacklisted on network
+                dialog.message -i=$icon("socketwarning") ("Delete Channel From Highlight Blacklist", %channel" is not blacklisted on "%network".","escape=Cancel") { }
+            }
+        }
+    }
+
+    privateimpl(%dialog,"Cancel")
+    {
+        # Hiding dialog
+        $$->$hide
+    }
+    
+    objects.connect %button_OK clicked %dialog OK
+    objects.connect %button_Cancel clicked %dialog Cancel
+    
+    # Saving dialog object ID
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"} = %dialog
+
+    # Integrating into main toolbar
+    # Creating script popup
+    if ($popup.exists("HighlightManagementScript_Main")) popup.destroy "HighlightManagementScript_Main"
+    popup.create "HighlightManagementScript_Main"
+    popup.addItem("HighlightManagementScript_Main", "Turn script on",,, \%HighlightManagementScript_Settings{\"Status\"} == \"Off\") HighlightManagementScript "On"
+    popup.addItem("HighlightManagementScript_Main", "Turn script off",,, \%HighlightManagementScript_Settings{\"Status\"} == \"On\") HighlightManagementScript "Off"
+    popup.addSeparator "HighlightManagementScript_Main"
+    popup.addItem("HighlightManagementScript_Main", "List blacklisted nicks") HighlightManagementScript "listnicks"
+    popup.addItem("HighlightManagementScript_Main", "Add nick to blacklist on network...")
+    {
+        # Showing dialog
+        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_AddNickToHighlightBlacklist"}->$show
+    }
+    popup.addItem("HighlightManagementScript_Main", "Delete nick from blacklist on network...")
+    {
+        # Showing dialog
+        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteNickFromHighlightBlacklist"}->$show
+    }
+    popup.addSeparator "HighlightManagementScript_Main"
+    popup.addItem("HighlightManagementScript_Main", "List blacklisted channels") HighlightManagementScript "listchans"
+    popup.addItem("HighlightManagementScript_Main", "Add channel to blacklist on network...")
+    {
+        # Showing dialog
+        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_AddChannelToHighlightBlacklist"}->$show
+    }
+    popup.addItem("HighlightManagementScript_Main", "Delete channel from blacklist on network...")
+    {
+        # Showing dialog
+        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"}->$show
+    }
+    popup.delitem -q "Scripts" "HighlightManagementScript_Main"
+    popup.addExtPopup "Scripts" "HighlightManagementScript_Main" "Highlight Management Script" "" "HighlightManagementScript_Main"
+    
+    # Tying main script popup to KVIrc menu (appears after 'Scripting')
+    setmenu -i=2 "Scripts" "Scripts"
+    
+    # Integrating into channel popup
+    if ($popup.exists("HighlightManagementScript_Channel")) popup.destroy "HighlightManagementScript_Channel"
+    popup.create "HighlightManagementScript_Channel"
+    popup.addItem("HighlightManagementScript_Channel", "Add \$target to blacklist on \$context.networkName",,, \%HighlightManagementScript_Settings{\"BlacklistedChans\"}{\$context.networkName}{\$target} == \"\") 
+    {
+        # Obtaining notes
+        dialog.textinput -i=$icon(serverinfo) ("Add "$target" To Highlight Blacklist", "Notes associated with blacklisting "$target" (optional):", "Add", "escape=Cancel")
+        {
+            # Debug code
+            #echo "Dialog return value: "$0
+
+            # Exiting if user cancelled
+            if ($0 == 1) return
+            
+            # Setting notes
+            %notes = $1
+
+            # Blacklisting channel
+            HighlightManagementScript "addchan" $context.networkName $target %notes
+        }
+    }
+    popup.addItem("HighlightManagementScript_Channel", "Delete \$target from blacklist on \$context.networkName",,, \%HighlightManagementScript_Settings{\"BlacklistedChans\"}{\$context.networkName}{\$target} != \"\") 
+    {
+        # Deleting channel from blacklist
+        HighlightManagementScript "deletechan" $context.networkName $target
+    }
+
+    # Adding Highlight Management Script menu to channel popup (ensuring that it doesn't exist already)
+    popup.delitem -q "channeltextview" "HighlightManagementScript_Channel"
+    popup.addSeparator "channeltextview" "HighlightManagementScript_Channel_Separator" "\%HighlightManagementScript_Settings{\"Status\"} == \"On\""
+    popup.addExtPopup "channeltextview" "HighlightManagementScript_Channel" "Highlight Management Script" "" "HighlightManagementScript_Channel" "\%HighlightManagementScript_Settings{\"Status\"} == \"On\""
+
+    # Integrating into nicklist popup
+    # Creating script popup
+    if ($popup.exists("HighlightManagementScript_Nicklist")) popup.destroy "HighlightManagementScript_Nicklist"
+    popup.create "HighlightManagementScript_Nicklist"
+    popup.addItem("HighlightManagementScript_Nicklist", "Add \$0 to blacklist on \$context.networkName",,, \%HighlightManagementScript_Settings{\"BlacklistedNicks\"}{\$context.networkName}{\$0} == \"\") 
+    {
+        # Obtaining notes - passing nick as a magic parameter so that it is accessible to the dialog code
+        dialog.textinput -i=$icon(serverinfo) ("Add "$0" To Highlight Blacklist", "Notes associated with blacklisting "$0" (optional):", "Add", "escape=Cancel",,$0)
+        {
+            # Debug code
+            #echo "Dialog return value: "$0
+
+            # Exiting if user cancelled
+            if ($0 == 1) return
+            
+            # Setting notes
+            %notes = $1
+
+            # Blacklisting nick
+            HighlightManagementScript "addnick" $context.networkName $2 %notes
+        }
+    }
+    popup.addItem("HighlightManagementScript_Nicklist", "Delete \$0 from blacklist on \$context.networkName",,, \%HighlightManagementScript_Settings{\"BlacklistedNicks\"}{\$context.networkName}{\$0} != \"\") 
+    {
+        # Deleting nick from blacklist
+        HighlightManagementScript "deletenick" $context.networkName $0
+    }
+
+    # Adding Highlight Management Script menu to nicklist popup (ensuring that it doesn't exist already)
+    popup.delitem -q "channel" "HighlightManagementScript_Nicklist"
+    popup.addSeparator "channel" "HighlightManagementScript_Nicklist_Separator" \%HighlightManagementScript_Settings{\"Status\"} == \"On\"
+    popup.addExtPopup "channel" "HighlightManagementScript_Nicklist" "Highlight Management Script" "" "HighlightManagementScript_Nicklist" \%HighlightManagementScript_Settings{\"Status\"} == \"On\"
+}
+
+# Uninstaller alias
+alias(HighlightManagementScript::uninstall::uninstall)
+{
+    # All events and aliases should be uninstalled here
+    event(OnHighlight,HighlightManagementScript) {}
+    event(OnKVIrcStartup,HighlightManagementScript) {}
+    alias(HighlightManagementScript) {}
+    alias(HighlightManagementScript::IsHighlight) {}
+    alias(HighlightManagementScript::Save) {}
+    alias(HighlightManagementScript::Startup) {}
+    alias(HighlightManagementScript::uninstall::uninstall) {}
+
+    # Removing popups
+    popup.delitem -q "Scripts" "HighlightManagementScript_Main"
+    popup.delitem -q "channeltextview" "HighlightManagementScript_Channel"
+    popup.delitem -q "channeltextview" "HighlightManagementScript_Channel_Separator"
+    popup.delitem -q "channel" "HighlightManagementScript_Nicklist"
+    popup.delitem -q "channel" "HighlightManagementScript_Nicklist_Separator"
+    popup.destroy -q "HighlightManagementScript_Main"
+    popup.destroy -q "HighlightManagementScript_Channel"
+    popup.destroy -q "HighlightManagementScript_Nicklist"
+
+    # Destroying objects
+    foreach(%object,$keys(%HighlightManagementScript_Settings{"GUI"}))
+    {
+        destroy %HighlightManagementScript_Settings{"GUI"}{%object}
+    }
+
+    # Clearing global variables
+    %HighlightManagementScript_Settings = ""
+}
+
+
+# COMMENTS
+
+# %HighlightManagementScript_Settings format:
+
+# Item: {"Status"}. Data: Script status - 'On'/'Off'.
+# Item: {"BlacklistedChans"}. Data: Hash of all blacklisted channels.
+# Item: {"BlacklistedChans"}{<network>}{<channel>}. Data: Notes, if different from the channel itself (KVIrc doesn't allow empty items). Overall presence of item indicates channel is blacklisted.
+# Item: {"BlacklistedNicks"}. Data: Hash of all blacklisted nicks.
+# Item: {"BlacklistedNicks"}{<network>}{<nick>}. Data: Notes, if different from the nick itself (KVIrc doesn't allow empty items). Overall presence of item indicates nick is blacklisted.
+# Item: {"GUI"}. Data: GUI objects.
