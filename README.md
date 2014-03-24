@@ -41,7 +41,7 @@ The nick blacklisting dialog:
 
 The 'Network' entry is the name of the relevant network - if you don't know this off-hand, use the following command in a window associated with the server:
 
-/echo $context.networkName
+    /echo $context.networkName
 
 Deletion of nick from blacklist dialog:
 
