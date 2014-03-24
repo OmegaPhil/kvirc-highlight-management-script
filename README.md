@@ -95,7 +95,7 @@ Try out my modification of the [geany](http://www.geany.org/) IDE, extending it 
 Bugs And Feature Requests
 =========================
 
-Please create an issue on the Github issue tracker.
+Please create an issue on the [Github issue tracker](https://github.com/OmegaPhil/kvirc-highlight-management-script/issues).
 
 
 Contact Details
