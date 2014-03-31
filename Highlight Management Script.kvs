@@ -1,7 +1,7 @@
 # Highlight Management Script
 # ===========================
 
-# Version 1.2 February 2011
+# Version 1.3 March 2014
 
 /*
 Copyright (C) 2011-2014 OmegaPhil (OmegaPhil+KVIrc@gmail.com)
@@ -579,11 +579,11 @@ alias(HighlightManagementScript::Startup)
                 # Success - reporting based on presence of notes
                 if (%notes != "")
                 {
-                    dialog.message -i=$icon("serverinfo") ("Add Nick To Highlight Blacklist", "Added "%nick" ("%notes") to nick blacklist on "%network".","escape=Cancel") { }
+                    dialog.message("Add Nick To Highlight Blacklist", "Added "%nick" ("%notes") to nick blacklist on "%network".","Information") { }
                 }
                 else
                 {
-                    dialog.message -i=$icon("serverinfo") ("Add Nick To Highlight Blacklist", "Added "%nick" to nick blacklist on "%network".","escape=Cancel") { }
+                    dialog.message("Add Nick To Highlight Blacklist", "Added "%nick" to nick blacklist on "%network".","Information") { }
                 }
                 $$->$hide
             }
@@ -591,19 +591,19 @@ alias(HighlightManagementScript::Startup)
             case(1)
             {
                 # Network wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Add Nick To Highlight Blacklist", "Please specify a network to blacklist on.","escape=Cancel") { }
+                dialog.message("Add Nick To Highlight Blacklist", "Please specify a network to blacklist on.","Warning") { }
             }
             
             case(2)
             {
                 # Nick wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Add Nick To Highlight Blacklist", "Please specify a nick to blacklist on "%network".","escape=Cancel") { }
+                dialog.message("Add Nick To Highlight Blacklist", "Please specify a nick to blacklist on "%network".","Warning") { }
             }
 
             case(3)
             {
                 # Nick already blacklisted on network
-                dialog.message -i=$icon("socketwarning") ("Add Nick To Highlight Blacklist", %nick" is already blacklisted on "%network".","escape=Cancel") { }
+                dialog.message("Add Nick To Highlight Blacklist", %nick" is already blacklisted on "%network".","Warning") { }
             }
         }
     }
@@ -696,26 +696,26 @@ alias(HighlightManagementScript::Startup)
             case(0)
             {
                 # Success
-                dialog.message -i=$icon("serverinfo") ("Delete Nick From Highlight Blacklist", "Deleted "%nick" from blacklist on "%network".","escape=Cancel") { }
+                dialog.message("Delete Nick From Highlight Blacklist", "Deleted "%nick" from blacklist on "%network".","Information") { }
                 $$->$hide
             }
             
             case(1)
             {
                 # Network wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Delete Nick From Highlight Blacklist", "Please specify a network to remove a blacklisted nick from.","escape=Cancel") { }
+                dialog.message("Delete Nick From Highlight Blacklist", "Please specify a network to remove a blacklisted nick from.","Warning") { }
             }
             
             case(2)
             {
                 # Nick wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Delete Nick From Highlight Blacklist", "Please specify a nick to remove from the blacklist on "%network".","escape=Cancel") { }
+                dialog.message("Delete Nick From Highlight Blacklist", "Please specify a nick to remove from the blacklist on "%network".","Warning") { }
             }
 
             case(3)
             {
                 # Nick isn't blacklisted on network
-                dialog.message -i=$icon("socketwarning") ("Delete Nick From Highlight Blacklist", %nick" is not blacklisted on "%network".","escape=Cancel") { }
+                dialog.message("Delete Nick From Highlight Blacklist", %nick" is not blacklisted on "%network".","Warning") { }
             }
         }
     }
@@ -794,11 +794,11 @@ alias(HighlightManagementScript::Startup)
                 # Success - reporting based on presence of notes
                 if (%notes != "")
                 {
-                    dialog.message -i=$icon("serverinfo") ("Add Channel To Highlight Blacklist", "Added "%channel" ("%notes") to channel blacklist on "%network".","escape=Cancel") { }
+                    dialog.message("Add Channel To Highlight Blacklist", "Added "%channel" ("%notes") to channel blacklist on "%network".","Information") { }
                 }
                 else
                 {
-                    dialog.message -i=$icon("serverinfo") ("Add Channel To Highlight Blacklist", "Added "%channel" to channel blacklist on "%network".","escape=Cancel") { }
+                    dialog.message("Add Channel To Highlight Blacklist", "Added "%channel" to channel blacklist on "%network".","Information") { }
                 }
                 $$->$hide
             }
@@ -806,19 +806,19 @@ alias(HighlightManagementScript::Startup)
             case(1)
             {
                 # Network wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Add Channel To Highlight Blacklist", "Please specify a network to blacklist on.","escape=Cancel") { }
+                dialog.message("Add Channel To Highlight Blacklist", "Please specify a network to blacklist on.","Warning") { }
             }
 
             case(2)
             {
                 # Channel wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Add Channel To Highlight Blacklist", "Please specify a channel to blacklist on "%network".","escape=Cancel") { }
+                dialog.message("Add Channel To Highlight Blacklist", "Please specify a channel to blacklist on "%network".","Warning") { }
             }
 
             case(3)
             {
                 # Channel already blacklisted on network
-                dialog.message -i=$icon("socketwarning") ("Add Channel To Highlight Blacklist", %channel" is already blacklisted on "%network".","escape=Cancel") { }
+                dialog.message("Add Channel To Highlight Blacklist", %channel" is already blacklisted on "%network".","Warning") { }
             }
         }
     }
@@ -911,26 +911,26 @@ alias(HighlightManagementScript::Startup)
             case(0)
             {
                 # Success
-                dialog.message -i=$icon("serverinfo") ("Delete Channel From Highlight Blacklist", "Deleted "%channel" from blacklist on "%network".","escape=Cancel") { }
+                dialog.message("Delete Channel From Highlight Blacklist", "Deleted "%channel" from blacklist on "%network".","Information") { }
                 $$->$hide
             }
             
             case(1)
             {
                 # Network wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Delete Channel From Highlight Blacklist", "Please specify a network to remove a blacklisted channel from.","escape=Cancel") { }
+                dialog.message("Delete Channel From Highlight Blacklist", "Please specify a network to remove a blacklisted channel from.","Warning") { }
             }
             
             case(2)
             {
                 # Channel wasn't specified
-                dialog.message -i=$icon("socketwarning") ("Delete Channel From Highlight Blacklist", "Please specify a channel to remove from the blacklist on "%network".","escape=Cancel") { }
+                dialog.message("Delete Channel From Highlight Blacklist", "Please specify a channel to remove from the blacklist on "%network".","Warning") { }
             }
 
             case(3)
             {
                 # Channel isn't blacklisted on network
-                dialog.message -i=$icon("socketwarning") ("Delete Channel From Highlight Blacklist", %channel" is not blacklisted on "%network".","escape=Cancel") { }
+                dialog.message("Delete Channel From Highlight Blacklist", %channel" is not blacklisted on "%network".","Warning") { }
             }
         }
     }
