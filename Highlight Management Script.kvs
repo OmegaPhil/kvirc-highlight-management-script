@@ -977,9 +977,20 @@ alias(HighlightManagementScript::Startup)
         # Showing dialog
         %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"}->$show
     }
+
+    # Making sure the main 'Scripts' menu command exists
+    if ($(!($popup.exists("Scripts"))))
+    {
+        popup.create "Scripts"
+
+        # Tying main script popup to KVIrc menu (appears after 'Scripting')
+        setmenu -i=2 "Scripts" "Scripts"
+    }
+
+    # Adding Highlight Management Script to Scripts popup
     popup.delitem -q "Scripts" "HighlightManagementScript_Main"
     popup.addExtPopup "Scripts" "HighlightManagementScript_Main" "Highlight Management Script" "" "HighlightManagementScript_Main"
-    
+
     # Tying main script popup to KVIrc menu (appears after 'Scripting')
     setmenu -i=2 "Scripts" "Scripts"
     
