@@ -979,19 +979,13 @@ alias(HighlightManagementScript::Startup)
     }
 
     # Making sure the main 'Scripts' menu command exists
-    if ($(!($popup.exists("Scripts"))))
-    {
-        popup.create "Scripts"
-
-        # Tying main script popup to KVIrc menu (appears after 'Scripting')
-        setmenu -i=2 "Scripts" "Scripts"
-    }
+    if ($(!($popup.exists("Scripts")))) popup.create "Scripts"
 
     # Adding Highlight Management Script to Scripts popup
     popup.delitem -q "Scripts" "HighlightManagementScript_Main"
     popup.addExtPopup "Scripts" "HighlightManagementScript_Main" "Highlight Management Script" "" "HighlightManagementScript_Main"
 
-    # Tying main script popup to KVIrc menu (appears after 'Scripting')
+    # Tying main script popup to KVIrc menu (appears after 'Scripting') - this must be done on every program startup
     setmenu -i=2 "Scripts" "Scripts"
     
     # Integrating into channel popup
