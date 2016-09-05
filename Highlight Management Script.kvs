@@ -74,7 +74,7 @@ event(OnKVIrcStartup,HighlightManagementScript)
 alias(HighlightManagementScript)
 {
     # Variable allocation
-    %usageInstructions = "Usage: HighlightManagementScript <command>. <nothing>: Echos the status of the script. on: Turns script on. off: Turns script off. listnicks: Echoes all currently blacklisted nicks. addnick <network> <nick> [<notes>]: Adds the requested nick to the nick blacklist with notes if specified. deletenick <network> <nick>: Deletes the requested nick from the nick blacklist. listchans: Lists blacklisted chans. addchan <network name> <chan> [<notes>]: Adds the requested channel to the channel blacklist with notes if specified. deletechan <network name> <chan>: Deletes the requested channel from the channel blacklist. h/help: Echos usage instructions."
+    %usage_instructions = "Usage: HighlightManagementScript <command>. <nothing>: Echos the status of the script. on: Turns script on. off: Turns script off. listnicks: Echoes all currently blacklisted nicks. addnick <network> <nick> [<notes>]: Adds the requested nick to the nick blacklist with notes if specified. deletenick <network> <nick>: Deletes the requested nick from the nick blacklist. listchans: Lists blacklisted chans. addchan <network name> <chan> [<notes>]: Adds the requested channel to the channel blacklist with notes if specified. deletechan <network name> <chan>: Deletes the requested channel from the channel blacklist. h/help: Echos usage instructions."
     
     # Intercepting status request (nothing passed to the alias)
     if ($0 == "")
@@ -86,7 +86,7 @@ alias(HighlightManagementScript)
     # Intercepting help requests
     if ($0 == "h" || $0 == "help")
     {
-        echo %usageInstructions
+        echo %usage_instructions
         return
     }
     
@@ -143,14 +143,14 @@ alias(HighlightManagementScript)
         }
 
         # Looping for all networks that contain blacklisted nicks
-        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
-        foreach(%network,%sortedNetworks)
+        %sorted_networks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
+        foreach(%network,%sorted_networks)
         {
             echo "\nOn "%network":"
             
             # Looping for all blacklisted nicks in network
-            %sortedNicks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}))
-            foreach(%nick,%sortedNicks)
+            %sorted_nicks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}))
+            foreach(%nick,%sorted_nicks)
             {
                 # Obtaining potential notes
                 %notes = %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%nick}
@@ -202,8 +202,8 @@ alias(HighlightManagementScript)
             return 2
         }
         
-        # Setting blacklistNick
-        %blacklistNick = $2
+        # Setting blacklist_nick
+        %blacklist_nick = $2
         
         # Setting notes
         if ($3- != "")
@@ -213,29 +213,29 @@ alias(HighlightManagementScript)
         else
         {
             # Padding with nick - KVIrc doesn't allow empty hash items
-            %notes = %blacklistNick
+            %notes = %blacklist_nick
         }
         
         # Making sure nick isn't already blacklisted on the given network
-        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} != "")
+        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklist_nick} != "")
         {
             # Nick is already blacklisted, informing user and exiting
-            warning %blacklistNick" is already blacklisted on "%network"."
+            warning %blacklist_nick" is already blacklisted on "%network"."
             return 3
         }
         
-        # Adding blacklistNick on network with notes and saving
-        %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} = %notes
+        # Adding blacklist_nick on network with notes and saving
+        %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklist_nick} = %notes
         HighlightManagementScript::Save
         
         # Informational message
-        if (%notes != %blacklistNick)
+        if (%notes != %blacklist_nick)
         {
-            echo %blacklistNick" ("%notes") has been added to the nick blacklist on "%network"."
+            echo %blacklist_nick" ("%notes") has been added to the nick blacklist on "%network"."
         }
         else
         {
-            echo %blacklistNick" has been added to the nick blacklist on "%network"."
+            echo %blacklist_nick" has been added to the nick blacklist on "%network"."
         }
         return 0
     }
@@ -268,23 +268,23 @@ alias(HighlightManagementScript)
             return 2
         }
         
-        # Setting blacklistNick
-        %blacklistNick = $2
+        # Setting blacklist_nick
+        %blacklist_nick = $2
         
         # Making sure nick is blacklisted on the given network
-        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} == "")
+        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklist_nick} == "")
         {
             # Nick has not been blacklisted on the given network, informing user and exiting
-            warning %blacklistNick" has not been blacklisted on "%network"."
+            warning %blacklist_nick" has not been blacklisted on "%network"."
             return 3
         }
         
-        # Deleting blacklistNick on network and saving
-        %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklistNick} = ""
+        # Deleting blacklist_nick on network and saving
+        %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%blacklist_nick} = ""
         HighlightManagementScript::Save
         
         # Informational message
-        echo %blacklistNick" has been deleted from the nick blacklist on "%network"."
+        echo %blacklist_nick" has been deleted from the nick blacklist on "%network"."
         return 0
     }
     
@@ -303,14 +303,14 @@ alias(HighlightManagementScript)
         }
         
         # Looping for all networks that contain blacklisted channels
-        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}))
-        foreach(%network,%sortedNetworks)
+        %sorted_networks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}))
+        foreach(%network,%sorted_networks)
         {
             echo "\nOn "%network":"
             
             # Looping for all blacklisted channels in network
-            %sortedChannels = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}))
-            foreach(%channel,%sortedChannels)
+            %sorted_channels = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}))
+            foreach(%channel,%sorted_channels)
             {
                 # Obtaining potential notes
                 %notes = %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%channel}
@@ -362,8 +362,8 @@ alias(HighlightManagementScript)
             return 2
         }
         
-        # Setting blacklistChannel
-        %blacklistChannel = $2
+        # Setting blacklist_channel
+        %blacklist_channel = $2
         
         # Setting notes
         if ($3- != "")
@@ -373,29 +373,29 @@ alias(HighlightManagementScript)
         else
         {
             # Padding with channel - KVIrc doesn't allow empty hash items
-            %notes = %blacklistChannel
+            %notes = %blacklist_channel
         }
         
         # Making sure channel isn't already blacklisted on the given network
-        if (%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} != "")
+        if (%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklist_channel} != "")
         {
             # Channel is already blacklisted, informing user and exiting
-            warning %blacklistChannel" is already blacklisted on "%network"."
+            warning %blacklist_channel" is already blacklisted on "%network"."
             return 3
         }
         
-        # Adding blacklistChannel on network with notes and saving
-        %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} = %notes
+        # Adding blacklist_channel on network with notes and saving
+        %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklist_channel} = %notes
         HighlightManagementScript::Save
         
         # Informational message
-        if (%notes != %blacklistChannel)
+        if (%notes != %blacklist_channel)
         {
-            echo %blacklistChannel" ("%notes") has been added to the channel blacklist on "%network"."
+            echo %blacklist_channel" ("%notes") has been added to the channel blacklist on "%network"."
         }
         else
         {
-            echo %blacklistChannel" has been added to the channel blacklist on "%network"."
+            echo %blacklist_channel" has been added to the channel blacklist on "%network"."
         }
         return 0
     }
@@ -428,23 +428,23 @@ alias(HighlightManagementScript)
             return 2
         }
         
-        # Setting blacklistChannel
-        %blacklistChannel = $2
+        # Setting blacklist_channel
+        %blacklist_channel = $2
         
         # Making sure channel is blacklisted on the given network
-        if (%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} == "")
+        if (%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklist_channel} == "")
         {
             # Channel has not been blacklisted on the given network, informing user and exiting
-            warning %blacklistChannel" has not been blacklisted on "%network"."
+            warning %blacklist_channel" has not been blacklisted on "%network"."
             return 3
         }
         
-        # Deleting blacklistChannel on network and saving
-        %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklistChannel} = ""
+        # Deleting blacklist_channel on network and saving
+        %HighlightManagementScript_Settings{"BlacklistedChans"}{%network}{%blacklist_channel} = ""
         HighlightManagementScript::Save
         
         # Informational message
-        echo %blacklistChannel" has been deleted from the channel blacklist on "%network"."
+        echo %blacklist_channel" has been deleted from the channel blacklist on "%network"."
         return 0
     }
     
@@ -484,14 +484,14 @@ alias(HighlightManagementScript::IsHighlight)
 alias(HighlightManagementScript::Save)
 {
     # Opening config file
-    %configFileID = $config.open($file.localdir("/scripts/highlight_management_script_settings"))
+    %config_file_id = $config.open($file.localdir("/scripts/highlight_management_script_settings"))
     
     # Saving settings
-    config.clearsection %configFileID "KVIrc"
-    config.write %configFileID "HighlightManagementScript_Settings" $serialize(%HighlightManagementScript_Settings)
+    config.clearsection %config_file_id "KVIrc"
+    config.write %config_file_id "HighlightManagementScript_Settings" $serialize(%HighlightManagementScript_Settings)
 
     # Committing settings
-    config.close %configFileID
+    config.close %config_file_id
 }
 
 # HighlightManagementScript::Startup alias
@@ -504,13 +504,13 @@ alias(HighlightManagementScript::Startup)
     if ($file.exists($file.localdir("/scripts/highlight_management_script_settings")) == $true)
     {
         # Opening config file
-        %configFileID = $config.open($file.localdir("/scripts/highlight_management_script_settings"))
+        %config_file_id = $config.open($file.localdir("/scripts/highlight_management_script_settings"))
         
         # Loading settings
-        %HighlightManagementScript_Settings = $unserialize($config.read(%configFileID, "HighlightManagementScript_Settings"))
+        %HighlightManagementScript_Settings = $unserialize($config.read(%config_file_id, "HighlightManagementScript_Settings"))
         
         # Closing configuration file
-        config.close %configFileID
+        config.close %config_file_id
     }
 
     # Initialising settings if needed
@@ -653,8 +653,8 @@ alias(HighlightManagementScript::Startup)
     {
         # Populating listbox_network 
         $$->%listbox_network->$clear
-        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
-        foreach(%network,%sortedNetworks) $$->%listbox_network->$insertitem(%network)
+        %sorted_networks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
+        foreach(%network,%sorted_networks) $$->%listbox_network->$insertitem(%network)
 
         # Clearing listbox_nick
         $$->%listbox_nick->$clear
@@ -676,8 +676,8 @@ alias(HighlightManagementScript::Startup)
             
             # Populating nick listbox
             %dialog->%listbox_nick->$clear
-            %sortedNicks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}))
-            foreach(%nick,%sortedNicks) %dialog->%listbox_nick->$insertitem(%nick)
+            %sorted_nicks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}))
+            foreach(%nick,%sorted_nicks) %dialog->%listbox_nick->$insertitem(%nick)
         }
     }
 
@@ -868,8 +868,8 @@ alias(HighlightManagementScript::Startup)
     {
         # Populating listbox_network 
         $$->%listbox_network->$clear
-        %sortedNetworks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}))
-        foreach(%network,%sortedNetworks) $$->%listbox_network->$insertitem(%network)
+        %sorted_networks = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}))
+        foreach(%network,%sorted_networks) $$->%listbox_network->$insertitem(%network)
 
         # Clearing listbox_channel
         $$->%listbox_channel->$clear
@@ -891,8 +891,8 @@ alias(HighlightManagementScript::Startup)
             
             # Populating channel listbox
             %dialog->%listbox_channel->$clear
-            %sortedChannels = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}))
-            foreach(%channel,%sortedChannels) %dialog->%listbox_channel->$insertitem(%channel)
+            %sorted_channels = $sort($keys(%HighlightManagementScript_Settings{"BlacklistedChans"}{%network}))
+            foreach(%channel,%sorted_channels) %dialog->%listbox_channel->$insertitem(%channel)
         }
     }
 
