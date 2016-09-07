@@ -56,7 +56,34 @@ event(OnHighlight,HighlightManagementScript)
     }
     else
     {
-        # No need to take action with successful highlights yet
+        # Logging the highlight, detecting channel VS PM highlights
+        # Generating logline
+        %timestamp_format = %HighlightManagementScript_Settings{"HighlightLogTimestampFormat"}
+        %normal_highlight_format = %HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"}
+        %pm_highlight_format = %HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"}
+        %log_to_file = %HighlightManagementScript_Settings{"HighlightLogLogToFile"}
+        %timestamp = $date(%timestamp_format)
+
+        # All substitution variables are available for the loglines, even when it doesn't make sense - must be case-sensitive replace to work properly
+        if ($query($target) == 0)
+        {
+            %highlight_details = $str.replace(%normal_highlight_format, "\%t", %timestamp, $true)
+        }
+        else
+        {
+            %highlight_details = $str.replace(%pm_highlight_format, "\%t", %timestamp, $true)
+        }
+        %highlight_details = $str.replace(%highlight_details, "\%N", $context.networkName, $true)
+        %highlight_details = $str.replace(%highlight_details, "\%c", %channel, $true)
+        %highlight_details = $str.replace(%highlight_details, "\%n", %nick, $true)
+        %highlight_details = $str.replace(%highlight_details, "\%m", %message, $true)
+
+        # Logging to Highlight Log window
+        %log_window = %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_HighlightLog"}
+        %log_window->%log_widget->$append(%highlight_details)
+
+        # Logging to file if desired, in the user-configured KVIrc logs directory
+        if (%log_to_file == $true) file.write --append "$option("stringLogsPath")/Highlight Log - $date("y-m-d").txt" "%highlight_details\n"
     }
 }
 
@@ -516,6 +543,12 @@ alias(HighlightManagementScript::Startup)
     # Initialising settings if needed
     if (%HighlightManagementScript_Settings{"Status"} == "") %HighlightManagementScript_Settings{"Status"} = "On"
 
+    # If these Highlight Log defaults are changed, remember to update the HighlightFormatHelp label on the configuration dialog
+    if (%HighlightManagementScript_Settings{"HighlightLogTimestampFormat"} == "") %HighlightManagementScript_Settings{"HighlightLogTimestampFormat"} = "d/m/y H:M:S"
+    if (%HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"} == "") %HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"} = "[\%t] On \%N, message on \%c from \%n: \%m"
+    if (%HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"} == "") %HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"} = "[\%t] On \%N, PM from \%n: \%m"
+    if (%HighlightManagementScript_Settings{"HighlightLogLogToFile"} == "") %HighlightManagementScript_Settings{"HighlightLogLogToFile"} = $true
+
     # Creating dialogs
     # Add Nick To Blacklist dialog
     %dialog = $new(dialog,,"HighlightManagementScript_AddNickToHighlightBlacklist")
@@ -947,6 +980,120 @@ alias(HighlightManagementScript::Startup)
     # Saving dialog object ID
     %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"} = %dialog
 
+    # Configure Highlight Management Script dialog
+    %dialog = $new(dialog,,"HighlightManagementScript_Configuration")
+    %dialog->$setWindowTitle("Configure Highlight Management Script")
+
+    %vbox = $new(vbox,%dialog,"VBox")
+    %layout = $new(layout,%dialog)
+    %layout->$addRowSpacing(0,30)
+    %layout->$addWidget(%vbox,0,0)
+
+    %label_top = $new(label,%vbox)
+    %label_top->$setText("Configuration for the Highlight Log window:\n")
+
+    %label_normal_timestamp_format = $new(label,%vbox)
+    %label_normal_timestamp_format->$setText("Timestamp format:")
+
+    %lineedit_timestamp_format = $new(lineedit,%vbox,"TimestampFormat")
+    %dialog->%lineedit_timestamp_format = %lineedit_timestamp_format
+
+    %label_timestamp_format_help = $new(label,%vbox,"TimestampFormatHelp")
+    %label_timestamp_format_help->$setText("\nThe timestamp format string is passed through KVIrc's \$date function (see http://www.kvirc.net/doc/fnc_date.html for full documentation) - the following returns date and time in the normal English form (text is copyable):\n\n4rd of March 1970 01:02AM -> '04/03/70 01:02': d/m/y H:M:S\n")
+    %label_timestamp_format_help->$setAlignment("Justify")
+
+    %label_normal_highlight_format = $new(label,%vbox)
+    %label_normal_highlight_format->$setText("Log line format for normal highlight:")
+
+    %lineedit_normal_highlight_format = $new(lineedit,%vbox,"NormalHighlightFormat")
+    %dialog->%lineedit_normal_highlight_format = %lineedit_normal_highlight_format
+
+    %label_pm_highlight_format = $new(label,%vbox)
+    %label_pm_highlight_format->$setText("Log line format for PM highlight:")
+
+    %lineedit_pm_highlight_format = $new(lineedit,%vbox,"PMHighlightFormat")
+    %dialog->%lineedit_pm_highlight_format = %lineedit_pm_highlight_format
+
+    %label_highlight_format_help = $new(label,%vbox,"HighlightFormatHelp")
+    %label_highlight_format_help->$setText("\nThe following substitution variables are available:\n\nTimestamp: \%t\nNetwork name: \%N\nChannel: \%c\nNick: \%n\nMessage: \%m\n\nSee the default normal and PM highlight examples (text is copyable):\n\n[\%t] On \%N, message on \%c from \%n: \%m\n\n[\%t] On \%N, PM from \%n: \%m\n")
+
+    %checkbox_log_to_file = $new(checkbox,%vbox,"LogToFile")
+    %checkbox_log_to_file->$setText("Log highlights to file (output in the user-configured KVIrc log directory)")
+    %dialog->%checkbox_log_to_file = %checkbox_log_to_file
+
+    %hbox = $new(hbox,%dialog)
+    %layout->$addWidget(%hbox,1,0)
+
+    %button_OK = $new(button, %hbox)
+    %button_OK->$setText("OK")
+
+    %button_Cancel = $new(button, %hbox)
+    %button_Cancel->$setText("Cancel")
+
+    # Event overrides
+    privateimpl(%dialog,"showevent")
+    {
+        # Loading settings
+        $$->%lineedit_timestamp_format->$setText(%HighlightManagementScript_Settings{"HighlightLogTimestampFormat"})
+        $$->%lineedit_normal_highlight_format->$setText(%HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"})
+        $$->%lineedit_pm_highlight_format->$setText(%HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"})
+        $$->%checkbox_log_to_file->$setChecked(%HighlightManagementScript_Settings{"HighlightLogLogToFile"})
+
+        # Focussing lineedit_timestamp_format
+        $$->%lineedit_timestamp_format->$setFocus
+    }
+
+    privateimpl(%dialog,"OK")
+    {
+        # Obtaining information
+        %timestamp_format = $$->%lineedit_timestamp_format->$text
+        %normal_highlight_format = $$->%lineedit_normal_highlight_format->$text
+        %pm_highlight_format = $$->%lineedit_pm_highlight_format->$text
+        %checkbox_log_to_file = $$->%checkbox_log_to_file->$isChecked
+
+        # Validating
+        if (%timestamp_format == "")
+        {
+            dialog.message("Configure Highlight Management Script", "Please specify a timestamp format.","Warning") { }
+            $$->%lineedit_timestamp_format->$setFocus
+            return
+        }
+        if (%normal_highlight_format == "")
+        {
+            dialog.message("Configure Highlight Management Script", "Please specify a normal highlight log line format.","Warning") { }
+            $$->%lineedit_normal_highlight_format->$setFocus
+            return
+        }
+        if (%pm_highlight_format == "")
+        {
+            dialog.message("Configure Highlight Management Script", "Please specify a PM highlight log line format.","Warning") { }
+            $$->%lineedit_pm_highlight_format->$setFocus
+            return
+        }
+
+        # Saving settings
+        %HighlightManagementScript_Settings{"HighlightLogTimestampFormat"} = %timestamp_format
+        %HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"} = %normal_highlight_format
+        %HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"} = %pm_highlight_format
+        %HighlightManagementScript_Settings{"HighlightLogLogToFile"} = %checkbox_log_to_file
+        HighlightManagementScript::Save
+
+        # Hiding dialog
+        $$->$hide
+    }
+
+    privateimpl(%dialog,"Cancel")
+    {
+        # Hiding dialog
+        $$->$hide
+    }
+
+    objects.connect %button_OK clicked %dialog OK
+    objects.connect %button_Cancel clicked %dialog Cancel
+
+    # Saving dialog object ID
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_Configuration"} = %dialog
+
     # Integrating into main toolbar
     # Creating script popup
     if ($popup.exists("HighlightManagementScript_Main")) popup.destroy "HighlightManagementScript_Main"
@@ -976,6 +1123,12 @@ alias(HighlightManagementScript::Startup)
     {
         # Showing dialog
         %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"}->$show
+    }
+    popup.addSeparator "HighlightManagementScript_Main"
+    popup.addItem("HighlightManagementScript_Main", "Configure Highlight Log window...")
+    {
+        # Showing dialog
+        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_Configuration"}->$show
     }
 
     # Making sure the main 'Scripts' menu command exists
@@ -1052,6 +1205,19 @@ alias(HighlightManagementScript::Startup)
     popup.delitem -q "channel" "HighlightManagementScript_Nicklist"
     popup.addSeparator "channel" "HighlightManagementScript_Nicklist_Separator" \%HighlightManagementScript_Settings{\"Status\"} == \"On\"
     popup.addExtPopup "channel" "HighlightManagementScript_Nicklist" "Highlight Management Script" "" "HighlightManagementScript_Nicklist" \%HighlightManagementScript_Settings{\"Status\"} == \"On\"
+
+    # Creating the Highlight Log window
+    # Note that show isn't actually needed for windows - they are created immediately?
+    %log_window = $new(window,,"Highlight Log")
+    %log_widget = $new(multilineedit,%log_window,"Log")
+    %log_widget->$setReadOnly($true)
+
+    # Embedding log into window
+    %log_window->$setCentralWidget(%log_widget)
+    %log_window->%log_widget = %log_widget
+
+    # Saving window object ID
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_HighlightLog"} = %log_window
 }
 
 # Uninstaller alias
@@ -1096,4 +1262,8 @@ alias(HighlightManagementScript::uninstall::uninstall)
 # Item: {"BlacklistedChans"}{<network>}{<channel>}. Data: Notes, if different from the channel itself (KVIrc doesn't allow empty items). Overall presence of item indicates channel is blacklisted.
 # Item: {"BlacklistedNicks"}. Data: Hash of all blacklisted nicks.
 # Item: {"BlacklistedNicks"}{<network>}{<nick>}. Data: Notes, if different from the nick itself (KVIrc doesn't allow empty items). Overall presence of item indicates nick is blacklisted.
+# Item: {"HighlightLogTimestampFormat"}. Data: Format string for the Highlight Log timestamp.
+# Item: {"HighlightLogNormalHighlightFormat"}. Data: Format string for the Highlight Log normal highlight.
+# Item: {"HighlightLogPMHighlightFormat"}. Data: Format string for the Highlight Log PM highlight.
+# Item: {"HighlightLogLogToFile"}. Data: $true/$false. Indicates whether highlights are logged to file or not.
 # Item: {"GUI"}. Data: GUI objects.
