@@ -36,17 +36,14 @@ event(OnHighlight,HighlightManagementScript)
     # Exiting if script is turned off
     if (%HighlightManagementScript_Settings{"Status"} == "Off") return
     
-    # Setting nick
+    # Setting variables
     %nick = $0
-
-    # Setting channel
+    %username = $1
     %channel = $target
-    
-    # Setting message
     %message = $3
     
-    # Checking if the channel and/or nick is blacklisted
-    if ($HighlightManagementScript::IsHighlight(%nick, %channel) == $false)
+    # Checking if the channel, username and/or nick is blacklisted
+    if ($HighlightManagementScript::IsHighlight(%nick, %username, %channel) == $false)
     {
         # The highlight is blacklisted - echoing the message in the channel without triggerring highlighting (KVIrc is able to substitute the user and host fields itself)
         echoprivmsg --no-highlighting %nick * * %message
@@ -484,24 +481,30 @@ alias(HighlightManagementScript)
 }
 
 # HighlightManagementScript::IsHighlight alias
-# Usage: HighlightManagementScript::IsHighlight <nick> <channel>
+# Usage: HighlightManagementScript::IsHighlight <nick> <username> <channel>
 # Returns $true/$false based on whether the highlight is valid or not
 alias(HighlightManagementScript::IsHighlight)
 {
     # Making sure nick is passed
     if ($0 == "") error "HighlightManagementScript::IsHighlight was called without passing a nick."
-    
+
     # Setting nick
     %nick = $0
+
+    # Making sure username is passed
+    if ($1 == "") error "HighlightManagementScript::IsHighlight was called without passing a username. Parameters: '"$0-"'."
+
+    # Setting username
+    %username = $1
     
     # Making sure channel is passed
-    if ($1 == "") error "HighlightManagementScript::IsHighlight was called without passing a channel. Parameters: '"$0-"'."
+    if ($2 == "") error "HighlightManagementScript::IsHighlight was called without passing a channel. Parameters: '"$0-"'."
 
     # Setting channel
-    %channel = $1
+    %channel = $2
 
     # Returning whether highlight was valid or not (channel and/or nick is blacklisted or not)
-    if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{$context.networkName}{%nick} != "" || %HighlightManagementScript_Settings{"BlacklistedChans"}{$context.networkName}{%channel} != "")
+    if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{$context.networkName}{"Nicks"}{%nick} != "" || %HighlightManagementScript_Settings{"BlacklistedNicks"}{$context.networkName}{"Usernames"}{%username} != "" || %HighlightManagementScript_Settings{"BlacklistedChans"}{$context.networkName}{%channel} != "")
     {
         return $false
     }
@@ -552,6 +555,18 @@ alias(HighlightManagementScript::Startup)
     if (%HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"} == "") %HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"} = "[\%t] On \%N, message on \%c from \%n: \%m"
     if (%HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"} == "") %HighlightManagementScript_Settings{"HighlightLogPMHighlightFormat"} = "[\%t] On \%N, PM from \%n: \%m"
     if (%HighlightManagementScript_Settings{"HighlightLogLogToFile"} == "") %HighlightManagementScript_Settings{"HighlightLogLogToFile"} = $true
+
+    # Upgrading blacklisted nicks storage if necessary - prior to v1.4, you could only blacklist a nick and this was stored in {"BlacklistedNicks"}{<network>}{<nick>}, now this has been extended to allow for usernames and in future other things
+    foreach(%network, $keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}))
+    {
+        if (%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{"Nicks"} == "" || $typeof(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{"Nicks"}) != "hash")
+        {
+            %tmp_hash = ""
+            foreach(%nick, $keys(%HighlightManagementScript_Settings{"BlacklistedNicks"}{%network})) %tmp_hash{%nick} = %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{%nick}
+            %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network} = ""
+            %HighlightManagementScript_Settings{"BlacklistedNicks"}{%network}{"Nicks"} = %tmp_hash
+        }
+    }
 
     # Creating dialogs
     # Add Nick To Blacklist dialog
@@ -1148,10 +1163,10 @@ alias(HighlightManagementScript::Startup)
     # Integrating into channel popup
     if ($popup.exists("HighlightManagementScript_Channel")) popup.destroy "HighlightManagementScript_Channel"
     popup.create "HighlightManagementScript_Channel"
-    popup.addItem("HighlightManagementScript_Channel", "Add \$target to blacklist on \$context.networkName",,, \%HighlightManagementScript_Settings{\"BlacklistedChans\"}{\$context.networkName}{\$target} == \"\") 
+    popup.addItem("HighlightManagementScript_Channel", "Add nick \$target to blacklist on \$context.networkName",,, \%HighlightManagementScript_Settings{\"BlacklistedChans\"}{\$context.networkName}{\$target} == \"\")
     {
         # Obtaining notes
-        dialog.textinput -i=$icon(serverinfo) ("Add "$target" To Highlight Blacklist", "Notes associated with blacklisting "$target" (optional):", "Add", "escape=Cancel")
+        dialog.textinput -i=$icon(serverinfo) ("Add Nick $target To Highlight Blacklist", "Notes associated with blacklisting nick $target (optional):", "Add", "escape=Cancel")
         {
             # Debug code
             #echo "Dialog return value: "$0
@@ -1264,8 +1279,12 @@ alias(HighlightManagementScript::uninstall::uninstall)
 # Item: {"Status"}. Data: Script status - 'On'/'Off'.
 # Item: {"BlacklistedChans"}. Data: Hash of all blacklisted channels.
 # Item: {"BlacklistedChans"}{<network>}{<channel>}. Data: Notes, if different from the channel itself (KVIrc doesn't allow empty items). Overall presence of item indicates channel is blacklisted.
-# Item: {"BlacklistedNicks"}. Data: Hash of all blacklisted nicks.
-# Item: {"BlacklistedNicks"}{<network>}{<nick>}. Data: Notes, if different from the nick itself (KVIrc doesn't allow empty items). Overall presence of item indicates nick is blacklisted.
+# Item: {"BlacklistedNicks"}. Data: Hash of all blacklisted users in various identification forms.
+# Old: Item: {"BlacklistedNicks"}{<network>}{<nick>}. Data: Notes, if different from the nick itself (KVIrc doesn't allow empty items). Overall presence of item indicates nick is blacklisted.
+# Item: {"BlacklistedNicks"}{<network>}{"Nicks"}. Data: Hash of all blacklisted nicks.
+# Item: {"BlacklistedNicks"}{<network>}{"Nicks"}{<nick>}. Data: Notes, if different from the nick itself (KVIrc doesn't allow empty items). Overall presence of item indicates nick is blacklisted.
+# Item: {"BlacklistedNicks"}{<network>}{"Usernames"}. Data: Hash of all blacklisted nicks.
+# Item: {"BlacklistedNicks"}{<network>}{"Usernames"}{<username>}. Data: Notes, if different from the username itself (KVIrc doesn't allow empty items). Overall presence of item indicates username is blacklisted.
 # Item: {"HighlightLogTimestampFormat"}. Data: Format string for the Highlight Log timestamp.
 # Item: {"HighlightLogNormalHighlightFormat"}. Data: Format string for the Highlight Log normal highlight.
 # Item: {"HighlightLogPMHighlightFormat"}. Data: Format string for the Highlight Log PM highlight.
