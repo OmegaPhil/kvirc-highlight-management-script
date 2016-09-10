@@ -56,7 +56,10 @@ event(OnHighlight,HighlightManagementScript)
     }
     else
     {
-        # Logging the highlight, detecting channel VS PM highlights
+        # Logging the highlight
+        # Stripping colours - neither the highlight log window nor the log file can cope with these
+        %message = $str.stripcolors(%message)
+        
         # Generating logline
         %timestamp_format = %HighlightManagementScript_Settings{"HighlightLogTimestampFormat"}
         %normal_highlight_format = %HighlightManagementScript_Settings{"HighlightLogNormalHighlightFormat"}
@@ -64,6 +67,7 @@ event(OnHighlight,HighlightManagementScript)
         %log_to_file = %HighlightManagementScript_Settings{"HighlightLogLogToFile"}
         %timestamp = $date(%timestamp_format)
 
+        # Detecting channel VS PM highlights
         # All substitution variables are available for the loglines, even when it doesn't make sense - must be case-sensitive replace to work properly
         if ($query($target) == 0)
         {
