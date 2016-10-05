@@ -1390,17 +1390,14 @@ alias(HighlightManagementScript::Startup)
     # Saving dialog object ID
     %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_DeleteChannelFromHighlightBlacklist"} = %dialog
 
-    # Configure Highlight Management Script dialog
-    %dialog = $new(dialog,,"HighlightManagementScript_Configuration")
-    %dialog->$setWindowTitle("Configure Highlight Management Script")
+    # Configure Highlight Log Window dialog
+    %dialog = $new(dialog,,"HighlightManagementScript_HighlightLogWindowConfiguration")
+    %dialog->$setWindowTitle("Configure Highlight Log Window")
 
     %vbox = $new(vbox,%dialog,"VBox")
     %layout = $new(layout,%dialog)
     %layout->$addRowSpacing(0,30)
     %layout->$addWidget(%vbox,0,0)
-
-    %label_top = $new(label,%vbox)
-    %label_top->$setText("Configuration for the Highlight Log window:\n")
 
     %label_normal_timestamp_format = $new(label,%vbox)
     %label_normal_timestamp_format->$setText("Timestamp format:")
@@ -1502,7 +1499,7 @@ alias(HighlightManagementScript::Startup)
     objects.connect %button_Cancel clicked %dialog Cancel
 
     # Saving dialog object ID
-    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_Configuration"} = %dialog
+    %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_HighlightLogWindowConfiguration"} = %dialog
 
     # Integrating into main toolbar
     # Creating script popup
@@ -1550,7 +1547,7 @@ alias(HighlightManagementScript::Startup)
     popup.addItem("HighlightManagementScript_Main", "Configure Highlight Log window...")
     {
         # Showing dialog
-        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_Configuration"}->$show
+        %HighlightManagementScript_Settings{"GUI"}{"HighlightManagementScript_HighlightLogWindowConfiguration"}->$show
     }
 
     # Making sure the main 'Scripts' menu command exists
