@@ -55,13 +55,13 @@ Blacklisting on a nick isn't good enough when a user continuously changes their 
 
 In the example of a user with the full usermask 'Not-bb4!~notifico@198.199.82.216', the user's nick is 'Not-bb4', and their username is '~notifico'. The tilde at the front is part of the username, and is prepended by the server when the user doesn't run a reachable ident service on their machine (which will be almost every real remote user, since its obsolescent).
 
-![Add username to highlight blacklist dialog](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/add-username-to-highlight-blacklist-dialog?raw=true)
+![Add username to highlight blacklist dialog](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/add-username-to-highlight-blacklist-dialog.png?raw=true)
 
 This dialog works in the same way as the nick blacklisting dialog.
 
 Deletion of username from blacklist dialog:
 
-![Delete username from highlight blacklist dialog](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/delete-username-from-highlight-blacklist-dialog?raw=true)
+![Delete username from highlight blacklist dialog](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/delete-username-from-highlight-blacklist-dialog.png?raw=true)
 
 This dialog works in the same way as the deletion of nick from blacklist dialog.
 
@@ -81,7 +81,7 @@ Listing blacklisted nicks, usernames and channels outputs them as text to the cu
 
 'Configure Highlight Log Window...' (discussed later) shows the following dialog:
 
-![Highlight Log Window configuration dialog](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/highlight-log-window-configuration-dialog?raw=true)
+![Highlight Log Window configuration dialog](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/highlight-log-window-configuration-dialog.png?raw=true)
 
 The dialog already comes with notes, but for convenience [here is the $date function documentation](http://www.kvirc.net/doc/fnc_date.html), and the directory used to log highlights can be found in the main KVIrc configuration under IRC -> Tools -> Logging -> 'Save logs to folder'. Currently the following is used as the log filename:
 
@@ -109,7 +109,7 @@ Highlight Log Window
 
 On starting the script up, the 'Highlight Log' window appears usually at the bottom of your window list. The following is an example of two highlights, one from a channel and one from a PM, with the default output configuration:
 
-![Highlight Log Window](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/highlight-log-window?raw=true)
+![Highlight Log Window](https://github.com/OmegaPhil/kvirc-highlight-management-script/blob/master/doc/highlight-log-window.png?raw=true)
 
 See under 'General Configuration' above for how to customise the output, and where the highlights are logged to file.
 
@@ -135,4 +135,4 @@ Please create an issue on the [Github issue tracker](https://github.com/OmegaPhi
 Contact Details
 ===============
 
-OmegaPhil+KVIrc.Script@gmail.com
+OmegaPhil@startmail.com
