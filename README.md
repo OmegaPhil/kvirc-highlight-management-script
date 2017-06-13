@@ -6,7 +6,7 @@ Last updated on 5.10.16 for v1.4.
 Installation
 ============
 
-To load the script into KVIrc (which then persists until you uninstall) and run its startup alias, first enable disable 'User friendly command-line mode' (it prevents the parse command from working):
+To load the script into KVIrc (which then persists until you uninstall) and run its startup alias, first disable 'User friendly command-line mode' (it prevents the parse command from working):
 
 In a KVIrc console window, look at the bottom right - on the far right of the text entry widget, you'll see an arrow button. Press to expand, then press the 3rd button from the left - normal KVS command mode is now active, and the parse command below works:
 
